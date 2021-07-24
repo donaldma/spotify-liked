@@ -1,18 +1,203 @@
 <template>
-  <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
-  </div>
+    <div class="home">
+        <button class="flex m-auto" @click="logout">Logout</button>
+        <button class="flex m-auto" @click="main">
+            Connect with Spotify
+        </button>
+        <div v-show="loading">Loading..</div>
+    </div>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from '@/components/HelloWorld.vue'
+/* eslint-disable */
+import { ref } from 'vue'
+import SpotifyWebApi from 'spotify-web-api-node'
+import { parse, stringifyUrl } from 'query-string'
+import { decodeXML } from 'entities'
+import concat from 'lodash/concat'
+import range from 'lodash/range'
+
+// dayjs
+import dayjs from 'dayjs'
+// dayjs plugins
+import isBetween from 'dayjs/plugin/isBetween'
+dayjs.extend(isBetween)
+import localizedFormat from 'dayjs/plugin/localizedFormat'
+dayjs.extend(localizedFormat)
 
 export default {
-  name: 'Home',
-  components: {
-    HelloWorld
-  }
+    name: 'Home',
+    components: {},
+    setup() {
+        console.log('setup')
+
+        const tokenKey = 'token'
+        const parsedHash = parse(location.hash)
+        const accessToken = parsedHash['access_token']
+
+        if (accessToken) {
+            localStorage.setItem(tokenKey, accessToken)
+            location.href = '/'
+            return
+        }
+
+        const api = new SpotifyWebApi({
+            clientId: process.env.VUE_APP_CLIENT_ID,
+            redirectUri: process.env.VUE_APP_REDIRECT_URI,
+            accessToken: localStorage.getItem(tokenKey),
+        })
+
+        return {
+            api,
+            tokenKey,
+            limit: ref(50),
+            offset: ref(0),
+            loading: ref(false),
+        }
+    },
+    methods: {
+        // auth
+        auth() {
+            const url = stringifyUrl({
+                url: 'https://accounts.spotify.com/en/authorize',
+                query: {
+                    client_id: this.api._credentials.clientId,
+                    redirect_uri: this.api._credentials.redirectUri,
+                    response_type: 'token',
+                    scope: [
+                        'user-library-read',
+                        'playlist-modify-public',
+                        'playlist-read-collaborative',
+                    ],
+                    show_dialog: true,
+                    state: 'spotify-liked-this-week',
+                },
+            })
+            location.href = url
+        },
+        logout() {
+            localStorage.removeItem(this.tokenKey)
+            location.href = '/'
+        },
+        // api methods
+        async main() {
+            console.log('main')
+
+            this.loading = true
+
+            try {
+                const { body } = await this.api.getMe()
+                const { tracks, start, end } = await this.getMySavedTracks()
+                const playlist = await this.createOrEditPlaylist(start, end)
+                await this.api.addTracksToPlaylist(playlist.id, tracks)
+                console.log({ tracks, playlist, body })
+            } catch (error) {
+                if (error.statusCode === 401) {
+                    this.auth()
+                }
+                console.error(error)
+            } finally {
+                this.loading = false
+            }
+        },
+        async getMySavedTracks() {
+            console.log('getMySavedTracks')
+
+            let tracks = []
+
+            const instance = dayjs()
+            const today = instance.day()
+            const thisFri = instance.day(5)
+            const lastFri = instance.subtract(1, 'week').day(5)
+            const nextFri = instance.add(1, 'week').day(5)
+            const start = today < 5 ? lastFri : thisFri
+            const end = today < 5 ? thisFri : nextFri
+            const format = 'ddd, ll'
+
+            const get = async () => {
+                const { body: savedTracks } = await this.api.getMySavedTracks({
+                    limit: this.limit,
+                    offset: this.offset,
+                })
+
+                const bucket = savedTracks.items
+                    .filter(item => {
+                        return dayjs(item.added_at).isBetween(
+                            start,
+                            end,
+                            null,
+                            '[)'
+                        )
+                    })
+                    .map(item => item.track.uri)
+
+                tracks = concat(tracks, bucket)
+
+                if (bucket.length === this.limit) {
+                    this.offset = this.offset + this.limit
+                    await get()
+                }
+            }
+
+            await get()
+
+            return {
+                tracks,
+                start: start.format(format),
+                end: end.format(format),
+            }
+        },
+        async createOrEditPlaylist(start, end) {
+            console.log('createOrEditPlaylist')
+
+            const title = 'Liked This Week'
+            const descriptionPre = 'New songs liked by you this week'
+            const descriptionPost =
+                'Generated by https://github.com/donaldma/spotify-liked-this-week.'
+            const description = `${descriptionPre} [${start} - ${end}]. ${descriptionPost}`
+
+            const { body: playlists } = await this.api.getUserPlaylists({
+                limit: this.limit,
+            })
+
+            const foundPlaylist = playlists.items.find(item => {
+                const itemDescription = decodeXML(item.description)
+                return (
+                    item.name === title &&
+                    itemDescription.startsWith(descriptionPre) &&
+                    itemDescription.endsWith(descriptionPost)
+                )
+            })
+
+            if (foundPlaylist) {
+                console.log('editPlaylist')
+
+                const { id, snapshot_id, tracks } = foundPlaylist
+                const positions = range(0, tracks.total)
+                console.log(positions)
+
+                if (positions.length > 0) {
+                    await this.api.removeTracksFromPlaylistByPosition(
+                        id,
+                        positions,
+                        snapshot_id
+                    )
+                }
+
+                await this.api.changePlaylistDetails(id, {
+                    description,
+                })
+
+                return foundPlaylist
+            }
+
+            console.log('createPlaylist')
+            const {
+                body: createdPlaylist,
+            } = await this.api.createPlaylist(title, { description })
+
+            return createdPlaylist
+        },
+    },
 }
 </script>
