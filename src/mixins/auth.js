@@ -1,5 +1,5 @@
 export default {
-    setup() {
+    data() {
         return {
             key: 'token',
         }
@@ -15,10 +15,13 @@ export default {
             localStorage.setItem(this.key, token)
             location.href = '/'
         },
-        clearAuth() {
+        clearAuth(redirect = '/') {
             console.log('clearAuth')
             localStorage.removeItem(this.key)
-            location.href = '/'
+
+            if(redirect) {
+                location.href = redirect
+            }
         },
     },
 }

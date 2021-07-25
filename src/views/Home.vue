@@ -1,10 +1,19 @@
 <template>
-    <div class="home">
-        <button class="btn btn-primary flex mx-auto">
-            Connect with Spotify
-        </button>
+    <div class="hero">
+        <div v-show="!getAuth()" class="text-center hero-content">
+            <div class="max-w-md">
+                <h1 class="mb-5 text-5xl font-bold">Liked This Week.</h1>
+                <p class="mb-5">
+                    Generate a playlist filled with songs that you liked this
+                    week.
+                </p>
+                <button class="btn btn-primary flex mx-auto" @click="auth">
+                    Connect with Spotify
+                </button>
+            </div>
+        </div>
+
         <div v-show="loading">Loading..</div>
-        <a :href="text">{{ text }}</a>
 
         <iframe
             v-show="!loading"
@@ -14,7 +23,7 @@
             frameBorder="0"
             allowtransparency="true"
             allow="encrypted-media"
-        ></iframe>
+        />
     </div>
 </template>
 
@@ -65,9 +74,6 @@ export default {
             redirectUri: process.env.VUE_APP_REDIRECT_URI,
             accessToken: this.getAuth(),
         })
-    },
-    async mounted() {
-        console.log('mounted')
 
         await this.main()
     },
@@ -96,16 +102,17 @@ export default {
             this.loading = true
 
             try {
+                const { body: me } = await this.api.getMe()
                 const { tracks, start, end } = await this.getMySavedTracks()
                 const playlist = await this.createOrEditPlaylist(start, end)
                 await this.api.addTracksToPlaylist(playlist.id, tracks)
 
                 this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
 
-                console.log({ tracks, playlist })
+                console.log({ me, tracks, playlist })
             } catch (error) {
                 if (error.statusCode === 401) {
-                    this.auth()
+                    this.clearAuth(null)
                 }
                 console.error(error)
             } finally {
@@ -133,7 +140,7 @@ export default {
                 })
 
                 const bucket = savedTracks.items
-                    .filter(item => {
+                    .filter((item) => {
                         return dayjs(item.added_at).isBetween(
                             start,
                             end,
@@ -141,7 +148,7 @@ export default {
                             '[)'
                         )
                     })
-                    .map(item => item.track.uri)
+                    .map((item) => item.track.uri)
                 console.log({ start, end, bucket })
 
                 tracks = concat(tracks, bucket)
@@ -173,7 +180,7 @@ export default {
                 limit: this.limit,
             })
 
-            const foundPlaylist = playlists.items.find(item => {
+            const foundPlaylist = playlists.items.find((item) => {
                 const itemDescription = decodeXML(item.description)
                 return (
                     item.name === title &&
@@ -204,9 +211,10 @@ export default {
             }
 
             console.log('createPlaylist')
-            const {
-                body: createdPlaylist,
-            } = await this.api.createPlaylist(title, { description })
+            const { body: createdPlaylist } = await this.api.createPlaylist(
+                title,
+                { description }
+            )
 
             return createdPlaylist
         },
