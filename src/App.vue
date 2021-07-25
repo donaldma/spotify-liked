@@ -1,30 +1,42 @@
 <template>
-  <div id="nav">
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </div>
-  <router-view/>
+    <div
+        class="navbar rounded-box mb-2 text-neutral-content bg-neutral shadow-lg"
+    >
+        <div class="flex-1 mx-2 px-2">
+            <a class="text-lg font-bold">
+                LTW
+            </a>
+        </div>
+        <div class="flex-none">
+            <div class="flex items-center">
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" class="btn btn-ghost btn-circle">
+                        <div class="avatar">
+                            <div class="w-10 h-10 rounded-full">
+                                <img src="https://i.pravatar.cc/500?img=32" />
+                            </div>
+                        </div>
+                    </div>
+                    <ul
+                        class="menu dropdown-content rounded-box w-52 text-base-content bg-base-200 shadow"
+                    >
+                        <li>
+                            <router-link to="" @click="clearAuth">
+                                Logout
+                            </router-link>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <router-view />
 </template>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
+<script>
+import authMixin from '@/mixins/auth'
 
-#nav {
-  padding: 30px;
+export default {
+    mixins: [authMixin],
 }
-
-#nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-#nav a.router-link-exact-active {
-  color: #42b983;
-}
-</style>
+</script>

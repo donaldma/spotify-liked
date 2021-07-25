@@ -1,15 +1,24 @@
 <template>
     <div class="home">
-        <button class="flex m-auto" @click="logout">Logout</button>
-        <button class="flex m-auto" @click="main">
+        <button class="btn btn-primary flex mx-auto">
             Connect with Spotify
         </button>
         <div v-show="loading">Loading..</div>
+        <a :href="text">{{ text }}</a>
+
+        <iframe
+            v-show="!loading"
+            :src="playlist"
+            width="100%"
+            height="380"
+            frameBorder="0"
+            allowtransparency="true"
+            allow="encrypted-media"
+        ></iframe>
     </div>
 </template>
 
 <script>
-/* eslint-disable */
 import { ref } from 'vue'
 import SpotifyWebApi from 'spotify-web-api-node'
 import { parse, stringifyUrl } from 'query-string'
@@ -17,46 +26,52 @@ import { decodeXML } from 'entities'
 import concat from 'lodash/concat'
 import range from 'lodash/range'
 
-// dayjs
 import dayjs from 'dayjs'
-// dayjs plugins
 import isBetween from 'dayjs/plugin/isBetween'
 dayjs.extend(isBetween)
 import localizedFormat from 'dayjs/plugin/localizedFormat'
 dayjs.extend(localizedFormat)
 
+import authMixin from '@/mixins/auth'
+
 export default {
     name: 'Home',
     components: {},
+    mixins: [authMixin],
     setup() {
         console.log('setup')
 
-        const tokenKey = 'token'
+        return {
+            api: ref({}),
+            limit: ref(50),
+            offset: ref(0),
+            loading: ref(false),
+            playlist: ref(''),
+        }
+    },
+    async created() {
+        console.log('created')
+
         const parsedHash = parse(location.hash)
         const accessToken = parsedHash['access_token']
 
         if (accessToken) {
-            localStorage.setItem(tokenKey, accessToken)
-            location.href = '/'
+            this.setAuth(accessToken)
             return
         }
 
-        const api = new SpotifyWebApi({
+        this.api = new SpotifyWebApi({
             clientId: process.env.VUE_APP_CLIENT_ID,
             redirectUri: process.env.VUE_APP_REDIRECT_URI,
-            accessToken: localStorage.getItem(tokenKey),
+            accessToken: this.getAuth(),
         })
+    },
+    async mounted() {
+        console.log('mounted')
 
-        return {
-            api,
-            tokenKey,
-            limit: ref(50),
-            offset: ref(0),
-            loading: ref(false),
-        }
+        await this.main()
     },
     methods: {
-        // auth
         auth() {
             const url = stringifyUrl({
                 url: 'https://accounts.spotify.com/en/authorize',
@@ -75,22 +90,19 @@ export default {
             })
             location.href = url
         },
-        logout() {
-            localStorage.removeItem(this.tokenKey)
-            location.href = '/'
-        },
-        // api methods
         async main() {
             console.log('main')
 
             this.loading = true
 
             try {
-                const { body } = await this.api.getMe()
                 const { tracks, start, end } = await this.getMySavedTracks()
                 const playlist = await this.createOrEditPlaylist(start, end)
                 await this.api.addTracksToPlaylist(playlist.id, tracks)
-                console.log({ tracks, playlist, body })
+
+                this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
+
+                console.log({ tracks, playlist })
             } catch (error) {
                 if (error.statusCode === 401) {
                     this.auth()
@@ -125,11 +137,12 @@ export default {
                         return dayjs(item.added_at).isBetween(
                             start,
                             end,
-                            null,
+                            'day',
                             '[)'
                         )
                     })
                     .map(item => item.track.uri)
+                console.log({ start, end, bucket })
 
                 tracks = concat(tracks, bucket)
 
@@ -174,7 +187,6 @@ export default {
 
                 const { id, snapshot_id, tracks } = foundPlaylist
                 const positions = range(0, tracks.total)
-                console.log(positions)
 
                 if (positions.length > 0) {
                     await this.api.removeTracksFromPlaylistByPosition(

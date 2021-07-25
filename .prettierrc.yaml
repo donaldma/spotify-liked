@@ -2,3 +2,6 @@ trailingComma: 'es5'
 tabWidth: 4
 semi: false
 singleQuote: true
+
+twClassesPosition: 'components-first'
+twUnknownClassesPosition: 'start'

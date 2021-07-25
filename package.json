@@ -11,6 +11,7 @@
     "@tailwindcss/postcss7-compat": "^2.0.2",
     "autoprefixer": "^9",
     "core-js": "^3.6.5",
+    "daisyui": "^1.10.0",
     "dayjs": "^1.10.6",
     "entities": "^2.2.0",
     "lodash": "^4.17.21",
@@ -18,6 +19,7 @@
     "query-string": "^7.0.1",
     "spotify-web-api-node": "^5.0.2",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.0.2",
+    "theme-change": "^2.0.2",
     "vue": "^3.0.0",
     "vue-router": "^4.0.0-0"
   },
@@ -30,6 +32,8 @@
     "babel-eslint": "^10.1.0",
     "eslint": "^6.7.2",
     "eslint-plugin-vue": "^7.0.0",
+    "prettier": "^2.3.2",
+    "prettier-plugin-tailwind": "^2.2.12",
     "vue-cli-plugin-tailwind": "~2.0.6"
   },
   "eslintConfig": {

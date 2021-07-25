@@ -1,5 +1,5 @@
 module.exports = {
-    // mode: 'jit',
+    mode: 'jit',
     purge: { content: ['./public/**/*.html', './src/**/*.vue'] },
     darkMode: false, // or 'media' or 'class'
     theme: {
@@ -8,5 +8,5 @@ module.exports = {
     variants: {
         extend: {},
     },
-    plugins: [],
+    plugins: [require('daisyui')],
 }
