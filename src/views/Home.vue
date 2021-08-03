@@ -25,9 +25,10 @@
                     <option
                         v-for="(option, index) in options"
                         :key="index"
+                        :disabled="option.disabled"
                         @click="selected = index"
                     >
-                        {{ option }}
+                        {{ option.name }}
                     </option>
                 </select>
                 <button class="btn btn-primary flex w-full" @click="main">
@@ -75,11 +76,25 @@ export default {
     setup() {
         console.log('setup')
         const options = [
-            'Since last release period',
-            'Today',
-            'This Week',
-            'This Month',
-            'This Year',
+            {
+                label: 'Since last release period',
+            },
+            {
+                label: 'Today',
+                disabled: true,
+            },
+            {
+                label: 'This Week',
+                disabled: true,
+            },
+            {
+                label: 'This Month',
+                disabled: true,
+            },
+            {
+                label: 'This Year',
+                disabled: true,
+            },
         ]
 
         return {
@@ -155,16 +170,6 @@ export default {
             const instance = dayjs()
 
             if (this.selected === 0) {
-                const today = instance.day()
-                const thisFri = instance.day(5)
-                const lastFri = instance.subtract(1, 'week').day(5)
-                const nextFri = instance.add(1, 'week').day(5)
-                const start = today < 5 ? lastFri : thisFri
-                const end = today < 5 ? thisFri : nextFri
-                return { start, end }
-            }
-
-            if (this.selected === 1) {
                 const today = instance.day()
                 const thisFri = instance.day(5)
                 const lastFri = instance.subtract(1, 'week').day(5)
