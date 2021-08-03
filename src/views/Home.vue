@@ -1,29 +1,45 @@
 <template>
     <div class="hero">
-        <div v-show="!getAuth()" class="hero-content text-center">
+        <div class="hero-content text-center">
             <div class="max-w-md">
                 <h1 class="mb-5 text-5xl font-bold">Liked This Week.</h1>
                 <p class="mb-5">
                     Generate a playlist filled with songs that you liked this
                     week.
                 </p>
-                <button class="btn btn-primary flex mx-auto" @click="auth">
+                <button
+                    v-show="!getAuth()"
+                    class="btn btn-primary flex mb-5 mx-auto"
+                    @click="auth"
+                >
                     Connect with Spotify
+                </button>
+
+                <select
+                    v-show="getAuth()"
+                    class="select select-bordered mb-2 w-full"
+                >
+                    <option disabled="disabled" selected="selected">
+                        Choose your playlist type
+                    </option>
+                    <option
+                        v-for="(option, index) in options"
+                        :key="index"
+                        @click="selected = index"
+                    >
+                        {{ option }}
+                    </option>
+                </select>
+                <button class="btn btn-primary flex w-full" @click="main">
+                    Generate
                 </button>
             </div>
         </div>
+    </div>
 
-        <select class="select select-bordered w-full max-w-xs">
-            <option disabled="disabled" selected="selected">
-                Choose your superpower
-            </option>
-            <option>telekinesis</option>
-            <option>time travel</option>
-            <option>invisibility</option>
-        </select>
+    <div v-show="loading">Loading..</div>
 
-        <!-- <div v-show="loading">Loading..</div>
-
+    <div>
         <iframe
             v-show="!loading"
             :src="playlist"
@@ -32,7 +48,7 @@
             frameBorder="0"
             allowtransparency="true"
             allow="encrypted-media"
-        /> -->
+        />
     </div>
 </template>
 
@@ -58,6 +74,13 @@ export default {
     mixins: [authMixin],
     setup() {
         console.log('setup')
+        const options = [
+            'Since last release period',
+            'Today',
+            'This Week',
+            'This Month',
+            'This Year',
+        ]
 
         return {
             api: ref({}),
@@ -65,6 +88,8 @@ export default {
             offset: ref(0),
             loading: ref(false),
             playlist: ref(''),
+            selected: ref(0),
+            options: ref(options),
         }
     },
     async created() {
@@ -111,12 +136,12 @@ export default {
             this.loading = true
 
             try {
-                // const { body: me } = await this.api.getMe()
-                // const { tracks, start, end } = await this.getMySavedTracks()
-                // const playlist = await this.createOrEditPlaylist(start, end)
-                // await this.api.addTracksToPlaylist(playlist.id, tracks)
-                // this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
-                // console.log({ me, tracks, playlist })
+                const { body: me } = await this.api.getMe()
+                const { tracks, start, end } = await this.getMySavedTracks()
+                const playlist = await this.createOrEditPlaylist(start, end)
+                await this.api.addTracksToPlaylist(playlist.id, tracks)
+                this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
+                console.log({ me, tracks, playlist })
             } catch (error) {
                 if (error.statusCode === 401) {
                     this.clearAuth(null)
@@ -124,6 +149,29 @@ export default {
                 console.error(error)
             } finally {
                 this.loading = false
+            }
+        },
+        getStartEnd() {
+            const instance = dayjs()
+
+            if (this.selected === 0) {
+                const today = instance.day()
+                const thisFri = instance.day(5)
+                const lastFri = instance.subtract(1, 'week').day(5)
+                const nextFri = instance.add(1, 'week').day(5)
+                const start = today < 5 ? lastFri : thisFri
+                const end = today < 5 ? thisFri : nextFri
+                return { start, end }
+            }
+
+            if (this.selected === 1) {
+                const today = instance.day()
+                const thisFri = instance.day(5)
+                const lastFri = instance.subtract(1, 'week').day(5)
+                const nextFri = instance.add(1, 'week').day(5)
+                const start = today < 5 ? lastFri : thisFri
+                const end = today < 5 ? thisFri : nextFri
+                return { start, end }
             }
         },
         async getMySavedTracks() {

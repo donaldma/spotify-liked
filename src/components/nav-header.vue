@@ -130,7 +130,7 @@ export default {
 
     data() {
         return {
-            logo: 'LTW',
+            logo: 'Liked',
             version: 'alpha',
             DAISYUI_VERSION: process.env.DAISYUI_VERSION,
             themes: [
