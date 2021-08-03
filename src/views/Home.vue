@@ -1,6 +1,6 @@
 <template>
     <div class="hero">
-        <div v-show="!getAuth()" class="text-center hero-content">
+        <div v-show="!getAuth()" class="hero-content text-center">
             <div class="max-w-md">
                 <h1 class="mb-5 text-5xl font-bold">Liked This Week.</h1>
                 <p class="mb-5">
@@ -13,7 +13,16 @@
             </div>
         </div>
 
-        <div v-show="loading">Loading..</div>
+        <select class="select select-bordered w-full max-w-xs">
+            <option disabled="disabled" selected="selected">
+                Choose your superpower
+            </option>
+            <option>telekinesis</option>
+            <option>time travel</option>
+            <option>invisibility</option>
+        </select>
+
+        <!-- <div v-show="loading">Loading..</div>
 
         <iframe
             v-show="!loading"
@@ -23,7 +32,7 @@
             frameBorder="0"
             allowtransparency="true"
             allow="encrypted-media"
-        />
+        /> -->
     </div>
 </template>
 
@@ -102,14 +111,12 @@ export default {
             this.loading = true
 
             try {
-                const { body: me } = await this.api.getMe()
-                const { tracks, start, end } = await this.getMySavedTracks()
-                const playlist = await this.createOrEditPlaylist(start, end)
-                await this.api.addTracksToPlaylist(playlist.id, tracks)
-
-                this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
-
-                console.log({ me, tracks, playlist })
+                // const { body: me } = await this.api.getMe()
+                // const { tracks, start, end } = await this.getMySavedTracks()
+                // const playlist = await this.createOrEditPlaylist(start, end)
+                // await this.api.addTracksToPlaylist(playlist.id, tracks)
+                // this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
+                // console.log({ me, tracks, playlist })
             } catch (error) {
                 if (error.statusCode === 401) {
                     this.clearAuth(null)
