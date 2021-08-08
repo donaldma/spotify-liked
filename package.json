@@ -15,6 +15,7 @@
     "dayjs": "^1.10.6",
     "entities": "^2.2.0",
     "lodash": "^4.17.21",
+    "matcher": "^4.0.0",
     "postcss": "^7",
     "query-string": "^7.0.1",
     "spotify-web-api-node": "^5.0.2",

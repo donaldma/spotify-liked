@@ -1,7 +1,7 @@
 export default {
     data() {
         return {
-            key: 'token',
+            key: 'access_token',
         }
     },
 

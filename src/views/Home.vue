@@ -2,11 +2,8 @@
     <div class="hero">
         <div class="hero-content text-center">
             <div class="max-w-md">
-                <h1 class="mb-5 text-5xl font-bold">Liked This Week.</h1>
-                <p class="mb-5">
-                    Generate a playlist filled with songs that you liked this
-                    week.
-                </p>
+                <h1 class="mb-5 text-5xl font-bold">Liked</h1>
+                <p class="mb-5">Generate various playlists from your liked songs.</p>
                 <button
                     v-show="!getAuth()"
                     class="btn btn-primary flex mb-5 mx-auto"
@@ -15,51 +12,59 @@
                     Connect with Spotify
                 </button>
 
-                <select
-                    v-show="getAuth()"
-                    class="select select-bordered mb-2 w-full"
-                >
-                    <option disabled="disabled" selected="selected">
-                        Choose your playlist type
-                    </option>
-                    <option
-                        v-for="(option, index) in options"
-                        :key="index"
-                        :disabled="option.disabled"
-                        @click="selected = index"
+                <div v-show="getAuth()">
+                    <select
+                        class="select select-bordered mb-2 w-full"
+                        v-model="selected"
                     >
-                        {{ option.name }}
-                    </option>
-                </select>
-                <button class="btn btn-primary flex w-full" @click="main">
-                    Generate
-                </button>
+                        <option
+                            v-for="(option, index) in options"
+                            :key="index"
+                            :disabled="option.disabled"
+                            :value="index"
+                        >
+                            {{ option.label }}
+                        </option>
+                    </select>
+                    <button class="btn btn-primary flex w-full" @click="main">
+                        Generate
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div v-show="loading">Loading..</div>
-
-    <div>
-        <iframe
-            v-show="!loading"
-            :src="playlist"
-            width="100%"
-            height="380"
-            frameBorder="0"
-            allowtransparency="true"
-            allow="encrypted-media"
-        />
+    <!-- spotify loader -->
+    <div
+        v-show="loading"
+        class="h-[380px] flex items-center justify-center w-full"
+    >
+        Loading..
     </div>
+
+    <!-- spotify widget -->
+    <iframe
+        v-show="!loading && playlist"
+        :src="playlist"
+        width="100%"
+        height="380"
+        frameBorder="0"
+        allowtransparency="true"
+        allow="encrypted-media"
+    />
 </template>
 
 <script>
+/* eslint-disable */
 import { ref } from 'vue'
 import SpotifyWebApi from 'spotify-web-api-node'
 import { parse, stringifyUrl } from 'query-string'
 import { decodeXML } from 'entities'
+import { isMatch } from 'matcher'
+
 import concat from 'lodash/concat'
 import range from 'lodash/range'
+import chunk from 'lodash/chunk'
 
 import dayjs from 'dayjs'
 import isBetween from 'dayjs/plugin/isBetween'
@@ -77,23 +82,24 @@ export default {
         console.log('setup')
         const options = [
             {
-                label: 'Since last release period',
+                label: 'This Release Period',
+                disabled: false,
             },
             {
                 label: 'Today',
-                disabled: true,
+                disabled: false,
             },
             {
                 label: 'This Week',
-                disabled: true,
+                disabled: false,
             },
             {
                 label: 'This Month',
-                disabled: true,
+                disabled: false,
             },
             {
                 label: 'This Year',
-                disabled: true,
+                disabled: false,
             },
         ]
 
@@ -120,11 +126,9 @@ export default {
 
         this.api = new SpotifyWebApi({
             clientId: process.env.VUE_APP_CLIENT_ID,
-            redirectUri: process.env.VUE_APP_REDIRECT_URI,
+            redirectUri: process.env.URL || process.env.VUE_APP_REDIRECT_URI,
             accessToken: this.getAuth(),
         })
-
-        await this.main()
     },
     methods: {
         auth() {
@@ -151,12 +155,25 @@ export default {
             this.loading = true
 
             try {
+                // get me
                 const { body: me } = await this.api.getMe()
+                // get all liked tracks
                 const { tracks, start, end } = await this.getMySavedTracks()
+                // create or edit playlist info
                 const playlist = await this.createOrEditPlaylist(start, end)
-                await this.api.addTracksToPlaylist(playlist.id, tracks)
+                // add tracks to playlist
+                if (tracks.length > 0) {
+                    for (const chunkAdd of chunk(tracks, 100)) {
+                        await this.api.addTracksToPlaylist(
+                            playlist.id,
+                            chunkAdd
+                        )
+                    }
+                }
+                // update playlist widget
                 this.playlist = `https://open.spotify.com/embed/playlist/${playlist.id}?theme=0`
-                console.log({ me, tracks, playlist })
+
+                // console.log({ me, tracks, playlist, start, end })
             } catch (error) {
                 if (error.statusCode === 401) {
                     this.clearAuth(null)
@@ -169,6 +186,7 @@ export default {
         getStartEnd() {
             const instance = dayjs()
 
+            // This Release Period
             if (this.selected === 0) {
                 const today = instance.day()
                 const thisFri = instance.day(5)
@@ -176,6 +194,38 @@ export default {
                 const nextFri = instance.add(1, 'week').day(5)
                 const start = today < 5 ? lastFri : thisFri
                 const end = today < 5 ? thisFri : nextFri
+                return { start, end, unit: 'day', inclusivity: '[)' }
+            }
+
+            // Today
+            if (this.selected === 1) {
+                const unit = 'day'
+                const start = instance.startOf(unit)
+                const end = instance.endOf(unit)
+                return { start, end }
+            }
+
+            // This Week
+            if (this.selected === 2) {
+                const unit = 'week'
+                const start = instance.startOf(unit)
+                const end = instance.endOf(unit)
+                return { start, end }
+            }
+
+            // This Month
+            if (this.selected === 3) {
+                const unit = 'month'
+                const start = instance.startOf(unit)
+                const end = instance.endOf(unit)
+                return { start, end }
+            }
+
+            // This Year
+            if (this.selected === 4) {
+                const unit = 'year'
+                const start = instance.startOf(unit)
+                const end = instance.endOf(unit)
                 return { start, end }
             }
         },
@@ -184,13 +234,8 @@ export default {
 
             let tracks = []
 
-            const instance = dayjs()
-            const today = instance.day()
-            const thisFri = instance.day(5)
-            const lastFri = instance.subtract(1, 'week').day(5)
-            const nextFri = instance.add(1, 'week').day(5)
-            const start = today < 5 ? lastFri : thisFri
-            const end = today < 5 ? thisFri : nextFri
+            const { start, end, unit, inclusivity } = this.getStartEnd()
+            // console.log({ start, end, unit, inclusivity })
             const format = 'ddd, ll'
 
             const get = async () => {
@@ -204,12 +249,11 @@ export default {
                         return dayjs(item.added_at).isBetween(
                             start,
                             end,
-                            'day',
-                            '[)'
+                            unit,
+                            inclusivity || '[]'
                         )
                     })
                     .map((item) => item.track.uri)
-                console.log({ start, end, bucket })
 
                 tracks = concat(tracks, bucket)
 
@@ -227,14 +271,15 @@ export default {
                 end: end.format(format),
             }
         },
+        createdDescription(start, end) {
+            return `Generated by https://github.com/donaldma/spotify-liked [${start} - ${end}]`
+        },
         async createOrEditPlaylist(start, end) {
             console.log('createOrEditPlaylist')
 
-            const title = 'Liked This Week'
-            const descriptionPre = 'New songs liked by you this week'
-            const descriptionPost =
-                'Generated by https://github.com/donaldma/spotify-liked-this-week.'
-            const description = `${descriptionPre} [${start} - ${end}]. ${descriptionPost}`
+            const label = this.options[this.selected].label
+            const title = `Liked ${label}`
+            const description = this.createdDescription(start, end)
 
             const { body: playlists } = await this.api.getUserPlaylists({
                 limit: this.limit,
@@ -244,8 +289,7 @@ export default {
                 const itemDescription = decodeXML(item.description)
                 return (
                     item.name === title &&
-                    itemDescription.startsWith(descriptionPre) &&
-                    itemDescription.endsWith(descriptionPost)
+                    isMatch(itemDescription, this.createdDescription('*', '*'))
                 )
             })
 
