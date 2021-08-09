@@ -7,16 +7,13 @@ export default {
 
     methods: {
         getAuth() {
-            console.log('getAuth')
             return localStorage.getItem(this.key)
         },
         setAuth(token) {
-            console.log('setAuth')
             localStorage.setItem(this.key, token)
             location.href = '/'
         },
         clearAuth(redirect = '/') {
-            console.log('clearAuth')
             localStorage.removeItem(this.key)
 
             if(redirect) {
