@@ -67,6 +67,10 @@ import isBetween from 'dayjs/plugin/isBetween'
 dayjs.extend(isBetween)
 import localizedFormat from 'dayjs/plugin/localizedFormat'
 dayjs.extend(localizedFormat)
+import utc from 'dayjs/plugin/utc'
+dayjs.extend(utc)
+import timezone from 'dayjs/plugin/timezone'
+dayjs.extend(timezone)
 
 import authMixin from '@/mixins/auth'
 
@@ -204,13 +208,19 @@ export default {
 
             // This Release Period
             if (option === 0) {
-                const today = instance.day()
-                const thisFri = instance.day(5)
-                const lastFri = instance.subtract(1, 'week').day(5)
-                const nextFri = instance.add(1, 'week').day(5)
+                const east = instance.tz('America/New_York')
+                const today = east.day()
+                const thisFri = east.day(5)
+                const lastFri = east.subtract(1, 'week').day(5)
+                const nextFri = east.add(1, 'week').day(5)
                 const start = today < 5 ? lastFri : thisFri
                 const end = today < 5 ? thisFri : nextFri
-                return { start, end, unit: 'day', inclusivity: '[)' }
+                return {
+                    start: start.startOf('day'),
+                    end: end.startOf('day'),
+                    unit: 'day',
+                    inclusivity: '[)',
+                }
             }
 
             // Today
