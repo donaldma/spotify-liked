@@ -32,7 +32,10 @@
                             />
                         </label>
                     </div>
-                    <button class="btn btn-primary flex w-full" @click="main">
+                    <button
+                        class="btn btn-primary flex w-full"
+                        @click="mainWrapper"
+                    >
                         Generate
                     </button>
                 </div>
@@ -105,11 +108,13 @@ export default {
 
         // playlists stuff
         const playlists = ref([])
+        const time = ref()
         const doneMessage = computed(() => {
             const playlistsCount = playlists.value.length
             const playlistsPluralize = pluralize('playlist', playlistsCount)
+            const seconds = (time.value / 1000).toFixed(1) + 's'
 
-            return `Generated ${playlistsCount} ${playlistsPluralize}`
+            return `Generated ${playlistsCount} ${playlistsPluralize} in ${seconds}`
         })
 
         // query param stuff
@@ -129,6 +134,8 @@ export default {
             loading: ref(false),
             checked: ref(range(5)),
             options: ref(options),
+
+            time,
             playlists,
             doneMessage,
 
@@ -172,6 +179,13 @@ export default {
                 },
             })
             location.href = url
+        },
+        async mainWrapper() {
+            const before = performance.now()
+            await this.main()
+            const after = performance.now()
+
+            this.time = after - before
         },
         async main() {
             // console.log('main')
