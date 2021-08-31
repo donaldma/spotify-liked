@@ -2,29 +2,28 @@
     <div
         id="nav"
         class="
-            border-base-200
-            bg-base-100
-            text-base-content
             sticky
+            z-50
             inset-x-0
             top-0
-            z-50
             w-full
-            border-b
+            text-base-content
+            bg-base-100
+            border-b border-base-200
             transition
             duration-200
             ease-in-out
         "
     >
-        <div class="mx-auto space-x-1 navbar max-w-none">
-            <div class="flex items-center flex-none">
+        <div class="navbar mx-auto max-w-none space-x-1">
+            <div class="flex flex-none items-center">
                 <router-link
                     to="/"
-                    class="px-2 flex-0 btn btn-ghost md:px-4"
+                    class="flex-0 btn btn-ghost px-2 md:px-4"
                     aria-label="Homepage"
                 >
-                    <div class="inline-block text-3xl font-title text-primary">
-                        <span class="uppercase text-base-content">
+                    <div class="font-title inline-block text-primary text-3xl">
+                        <span class="text-base-content uppercase">
                             {{ logo }}
                         </span>
                     </div>
@@ -35,7 +34,7 @@
             <div class="flex-1" />
 
             <div class="dropdown dropdown-end" title="Change Theme">
-                <div tabindex="0" class="m-1 normal-case btn-ghost btn">
+                <div tabindex="0" class="btn-ghost btn m-1 normal-case">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -52,7 +51,7 @@
                     <span class="hidden md:inline"> Change Theme </span>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        class="inline-block w-4 h-4 ml-1 fill-current"
+                        class="inline-block ml-1 w-4 h-4 fill-current"
                         viewBox="0 0 1792 1792"
                     >
                         <path
@@ -62,19 +61,19 @@
                 </div>
                 <div
                     class="
-                        mt-16
-                        overflow-y-auto
-                        shadow-2xl
-                        top-px
                         dropdown-content
-                        h-96
-                        w-52
                         rounded-box
-                        bg-base-200
+                        top-px
+                        mt-16
+                        w-52
+                        h-96
                         text-base-content
+                        bg-base-200
+                        shadow-2xl
+                        overflow-y-auto
                     "
                 >
-                    <ul class="p-4 menu compact">
+                    <ul class="menu compact p-4">
                         <li v-for="(theme, index) in themes" :key="index">
                             <a
                                 tabindex="0"
@@ -88,7 +87,7 @@
             </div>
 
             <div v-if="getAuth()" class="dropdown dropdown-end" title="User">
-                <div tabindex="0" class="m-1 btn btn-ghost btn-circle">
+                <div tabindex="0" class="btn btn-ghost btn-circle m-1">
                     <div class="avatar">
                         <div class="w-10 h-10 rounded-full">
                             <img src="../assets/avatar.svg" />
@@ -97,18 +96,18 @@
                 </div>
                 <div
                     class="
-                        mt-16
-                        overflow-y-auto
-                        shadow-2xl
-                        top-px
                         dropdown-content
-                        w-52
                         rounded-box
-                        bg-base-200
+                        top-px
+                        mt-16
+                        w-52
                         text-base-content
+                        bg-base-200
+                        shadow-2xl
+                        overflow-y-auto
                     "
                 >
-                    <ul class="p-4 menu compact">
+                    <ul class="menu compact p-4">
                         <li>
                             <a tabindex="0" @click="() => clearAuth()">
                                 Logout
@@ -121,45 +120,38 @@
     </div>
 </template>
 
-<script>
+<script setup>
 import { themeChange } from 'theme-change'
-import authMixin from '@/mixins/auth'
+import { onMounted } from 'vue'
+import { getAuth, clearAuth } from '@/utils/auth'
 
-export default {
-    mixins: [authMixin],
+const logo = 'Liked'
+const version = 'alpha'
+const themes = [
+    { id: 'light', name: '🌝  light' },
+    { id: 'dark', name: '🌚  dark' },
+    { id: 'cupcake', name: '🧁  cupcake' },
+    { id: 'bumblebee', name: '🐝  bumblebee' },
+    { id: 'emerald', name: '✳️  Emerald' },
+    { id: 'corporate', name: '🏢  Corporate' },
+    { id: 'synthwave', name: '🌃  synthwave' },
+    { id: 'retro', name: '👴  retro' },
+    { id: 'cyberpunk', name: '🤖  cyberpunk' },
+    { id: 'valentine', name: '🌸  valentine' },
+    { id: 'halloween', name: '🎃  halloween' },
+    { id: 'garden', name: '🌷  garden' },
+    { id: 'forest', name: '🌲  forest' },
+    { id: 'aqua', name: '🐟  aqua' },
+    { id: 'lofi', name: '👓  lofi' },
+    { id: 'pastel', name: '🖍  pastel' },
+    { id: 'fantasy', name: '🧚‍♀️  fantasy' },
+    { id: 'wireframe', name: '📝  Wireframe' },
+    { id: 'black', name: '🏴  black' },
+    { id: 'luxury', name: '💎  luxury' },
+    { id: 'dracula', name: '🧛‍♂️  dracula' },
+]
 
-    data() {
-        return {
-            logo: 'Liked',
-            version: 'alpha',
-            DAISYUI_VERSION: process.env.DAISYUI_VERSION,
-            themes: [
-                { id: 'light', name: '🌝  light' },
-                { id: 'dark', name: '🌚  dark' },
-                { id: 'cupcake', name: '🧁  cupcake' },
-                { id: 'bumblebee', name: '🐝  bumblebee' },
-                { id: 'emerald', name: '✳️  Emerald' },
-                { id: 'corporate', name: '🏢  Corporate' },
-                { id: 'synthwave', name: '🌃  synthwave' },
-                { id: 'retro', name: '👴  retro' },
-                { id: 'cyberpunk', name: '🤖  cyberpunk' },
-                { id: 'valentine', name: '🌸  valentine' },
-                { id: 'halloween', name: '🎃  halloween' },
-                { id: 'garden', name: '🌷  garden' },
-                { id: 'forest', name: '🌲  forest' },
-                { id: 'aqua', name: '🐟  aqua' },
-                { id: 'lofi', name: '👓  lofi' },
-                { id: 'pastel', name: '🖍  pastel' },
-                { id: 'fantasy', name: '🧚‍♀️  fantasy' },
-                { id: 'wireframe', name: '📝  Wireframe' },
-                { id: 'black', name: '🏴  black' },
-                { id: 'luxury', name: '💎  luxury' },
-                { id: 'dracula', name: '🧛‍♂️  dracula' },
-            ],
-        }
-    },
-    mounted() {
-        themeChange(false)
-    },
-}
+onMounted(() => {
+    themeChange(false)
+})
 </script>

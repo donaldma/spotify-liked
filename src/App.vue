@@ -3,14 +3,6 @@
     <router-view />
 </template>
 
-<script>
-import authMixin from '@/mixins/auth'
+<script setup>
 import NavHeader from '@/components/nav-header'
-
-export default {
-    mixins: [authMixin],
-    components: {
-        NavHeader,
-    },
-}
 </script>

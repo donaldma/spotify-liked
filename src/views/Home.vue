@@ -52,11 +52,11 @@
     </div>
 </template>
 
-<script>
+<script setup>
 /* eslint-disable */
-import { ref, computed } from 'vue'
+import { ref, unref, computed } from 'vue'
 import SpotifyWebApi from 'spotify-web-api-node'
-import { parse, stringifyUrl } from 'query-string'
+import { stringifyUrl } from 'query-string'
 import { decodeXML } from 'entities'
 import { isMatch } from 'matcher'
 import pluralize from 'pluralize'
@@ -65,324 +65,233 @@ import concat from 'lodash/concat'
 import range from 'lodash/range'
 import chunk from 'lodash/chunk'
 
-import dayjs from 'dayjs'
-import isBetween from 'dayjs/plugin/isBetween'
-dayjs.extend(isBetween)
-import localizedFormat from 'dayjs/plugin/localizedFormat'
-dayjs.extend(localizedFormat)
-import utc from 'dayjs/plugin/utc'
-dayjs.extend(utc)
-import timezone from 'dayjs/plugin/timezone'
-dayjs.extend(timezone)
+import dayjs from '@/utils/dayjs'
+import { setAuth, getAuth, clearAuth } from '@/utils/auth'
+import { getStartEnd, createDescription } from '@/utils/spotify'
 
-import authMixin from '@/mixins/auth'
+setAuth()
 
-export default {
-    name: 'Home',
-    components: {},
-    mixins: [authMixin],
-    setup() {
-        // console.log('setup')
-        const options = [
-            {
-                label: 'This Release Period',
-                disabled: false,
-            },
-            {
-                label: 'Today',
-                disabled: false,
-            },
-            {
-                label: 'This Week',
-                disabled: false,
-            },
-            {
-                label: 'This Month',
-                disabled: false,
-            },
-            {
-                label: 'This Year',
-                disabled: false,
-            },
-        ]
+/**
+ * data
+ */
+const loading = ref(false)
+const checked = ref(range(5))
+const options = ref([
+    {
+        label: 'This Release Period',
+        disabled: false,
+    },
+    {
+        label: 'Today',
+        disabled: false,
+    },
+    {
+        label: 'This Week',
+        disabled: false,
+    },
+    {
+        label: 'This Month',
+        disabled: false,
+    },
+    {
+        label: 'This Year',
+        disabled: false,
+    },
+])
+// api stuff
+const api = ref(
+    new SpotifyWebApi({
+        clientId: process.env.VUE_APP_CLIENT_ID,
+        redirectUri: process.env.URL || process.env.VUE_APP_REDIRECT_URI,
+        accessToken: getAuth(),
+    })
+)
+const rawApi = unref(api)
 
-        // playlists stuff
-        const playlists = ref([])
-        const time = ref()
-        const doneMessage = computed(() => {
-            const playlistsCount = playlists.value.length
-            const playlistsPluralize = pluralize('playlist', playlistsCount)
-            const seconds = (time.value / 1000).toFixed(1) + 's'
+// playlists stuff
+const playlists = ref([])
+const time = ref()
+const doneMessage = computed(() => {
+    const playlistsCount = playlists.value.length
+    const playlistsPluralize = pluralize('playlist', playlistsCount)
+    const seconds = (time.value / 1000).toFixed(1) + 's'
 
-            return `Generated ${playlistsCount} ${playlistsPluralize} in ${seconds}`
+    return `Generated ${playlistsCount} ${playlistsPluralize} in ${seconds}`
+})
+
+// query param stuff
+const defaultQueryParams = {
+    limit: 50,
+    offset: 0,
+}
+const limit = ref(defaultQueryParams.limit)
+const offset = ref(defaultQueryParams.offset)
+const resetQueryParams = () => {
+    limit.value = defaultQueryParams.limit
+    offset.value = defaultQueryParams.offset
+}
+
+/**
+ * methods
+ */
+const auth = () => {
+    const url = stringifyUrl({
+        url: 'https://accounts.spotify.com/en/authorize',
+        query: {
+            client_id: rawApi._credentials.clientId,
+            redirect_uri: rawApi._credentials.redirectUri,
+            response_type: 'token',
+            scope: [
+                'user-library-read',
+                'playlist-modify-public',
+                'playlist-read-collaborative',
+            ],
+            show_dialog: true,
+            state: 'spotify-liked-this-week',
+        },
+    })
+    location.href = url
+}
+
+const mainWrapper = async () => {
+    const before = performance.now()
+    await main()
+    const after = performance.now()
+
+    time.value = after - before
+}
+
+const main = async () => {
+    // console.log('main')
+
+    loading.value = true
+
+    try {
+        // get me
+        const { body: me } = await rawApi.getMe()
+
+        playlists.value = []
+
+        for (const option of checked.value) {
+            // get all liked tracks
+            const { tracks, start, end } = await getMySavedTracks(option)
+            // create or edit playlist info
+            const playlist = await createOrEditPlaylist(start, end, option)
+            // add tracks to playlist
+            if (tracks.length > 0) {
+                for (const chunkAdd of chunk(tracks, 100)) {
+                    await rawApi.addTracksToPlaylist(playlist.id, chunkAdd)
+                }
+            }
+
+            playlists.value.push(playlist.external_urls.spotify)
+            // console.log({ tracks, playlist, start, end })
+        }
+    } catch (error) {
+        if (error.statusCode === 401) {
+            clearAuth(null)
+        }
+        console.error(error)
+    } finally {
+        loading.value = false
+    }
+}
+
+const getMySavedTracks = async (option) => {
+    let tracks = []
+    resetQueryParams()
+
+    const { start, end, unit, inclusivity } = getStartEnd(option)
+    const format = 'ddd, ll'
+
+    const get = async () => {
+        const { body: savedTracks } = await rawApi.getMySavedTracks({
+            limit: limit.value,
+            offset: offset.value,
         })
 
-        // query param stuff
-        const defaultQueryParams = {
-            limit: 50,
-            offset: 0,
-        }
-        const limit = ref(defaultQueryParams.limit)
-        const offset = ref(defaultQueryParams.offset)
-        const resetQueryParams = () => {
-            limit.value = defaultQueryParams.limit
-            offset.value = defaultQueryParams.offset
-        }
-
-        return {
-            api: ref({}),
-            loading: ref(false),
-            checked: ref(range(5)),
-            options: ref(options),
-
-            time,
-            playlists,
-            doneMessage,
-
-            limit,
-            offset,
-            resetQueryParams,
-        }
-    },
-    async created() {
-        // console.log('created')
-
-        const parsedHash = parse(location.hash)
-        const accessToken = parsedHash['access_token']
-
-        if (accessToken) {
-            this.setAuth(accessToken)
-            return
-        }
-
-        this.api = new SpotifyWebApi({
-            clientId: process.env.VUE_APP_CLIENT_ID,
-            redirectUri: process.env.URL || process.env.VUE_APP_REDIRECT_URI,
-            accessToken: this.getAuth(),
-        })
-    },
-    methods: {
-        auth() {
-            const url = stringifyUrl({
-                url: 'https://accounts.spotify.com/en/authorize',
-                query: {
-                    client_id: this.api._credentials.clientId,
-                    redirect_uri: this.api._credentials.redirectUri,
-                    response_type: 'token',
-                    scope: [
-                        'user-library-read',
-                        'playlist-modify-public',
-                        'playlist-read-collaborative',
-                    ],
-                    show_dialog: true,
-                    state: 'spotify-liked-this-week',
-                },
-            })
-            location.href = url
-        },
-        async mainWrapper() {
-            const before = performance.now()
-            await this.main()
-            const after = performance.now()
-
-            this.time = after - before
-        },
-        async main() {
-            // console.log('main')
-
-            this.loading = true
-
-            try {
-                // get me
-                const { body: me } = await this.api.getMe()
-
-                this.playlists = []
-
-                for (const option of this.checked) {
-                    // get all liked tracks
-                    const { tracks, start, end } = await this.getMySavedTracks(
-                        option
-                    )
-                    // create or edit playlist info
-                    const playlist = await this.createOrEditPlaylist(
-                        start,
-                        end,
-                        option
-                    )
-                    // add tracks to playlist
-                    if (tracks.length > 0) {
-                        for (const chunkAdd of chunk(tracks, 100)) {
-                            await this.api.addTracksToPlaylist(
-                                playlist.id,
-                                chunkAdd
-                            )
-                        }
-                    }
-
-                    this.playlists.push(playlist.external_urls.spotify)
-                    // console.log({ tracks, playlist, start, end })
-                }
-            } catch (error) {
-                if (error.statusCode === 401) {
-                    this.clearAuth(null)
-                }
-                console.error(error)
-            } finally {
-                this.loading = false
-            }
-        },
-        getStartEnd(option) {
-            const instance = dayjs()
-
-            // This Release Period
-            if (option === 0) {
-                const east = instance.tz('America/New_York')
-                const today = east.day()
-                const thisFri = east.day(5)
-                const lastFri = east.subtract(1, 'week').day(5)
-                const nextFri = east.add(1, 'week').day(5)
-                const start = today < 5 ? lastFri : thisFri
-                const end = today < 5 ? thisFri : nextFri
-                return {
-                    start: start.startOf('day'),
-                    end: end.startOf('day'),
-                    unit: 'day',
-                    inclusivity: '[)',
-                }
-            }
-
-            // Today
-            if (option === 1) {
-                const unit = 'day'
-                const start = instance.startOf(unit)
-                const end = instance.endOf(unit)
-                return { start, end }
-            }
-
-            // This Week
-            if (option === 2) {
-                const unit = 'week'
-                const start = instance.startOf(unit)
-                const end = instance.endOf(unit)
-                return { start, end }
-            }
-
-            // This Month
-            if (option === 3) {
-                const unit = 'month'
-                const start = instance.startOf(unit)
-                const end = instance.endOf(unit)
-                return { start, end }
-            }
-
-            // This Year
-            if (option === 4) {
-                const unit = 'year'
-                const start = instance.startOf(unit)
-                const end = instance.endOf(unit)
-                return { start, end }
-            }
-        },
-        async getMySavedTracks(option) {
-            let tracks = []
-            this.resetQueryParams()
-
-            const { start, end, unit, inclusivity } = this.getStartEnd(option)
-            const format = 'ddd, ll'
-
-            const get = async () => {
-                const { body: savedTracks } = await this.api.getMySavedTracks({
-                    limit: this.limit,
-                    offset: this.offset,
-                })
-
-                const bucket = savedTracks.items
-                    .filter((item) => {
-                        return dayjs(item.added_at).isBetween(
-                            start,
-                            end,
-                            unit,
-                            inclusivity || '[]'
-                        )
-                    })
-                    .map((item) => item.track.uri)
-
-                tracks = concat(tracks, bucket)
-
-                if (bucket.length === this.limit) {
-                    this.offset = this.offset + this.limit
-                    await get()
-                }
-            }
-
-            await get()
-
-            // console.log('getMySavedTracks', {
-            //     option,
-            //     length: tracks.length,
-            //     start,
-            //     end,
-            //     unit,
-            //     inclusivity,
-            // })
-
-            return {
-                tracks,
-                start: start.format(format),
-                end: end.format(format),
-            }
-        },
-        createdDescription(start, end) {
-            return `Generated by https://github.com/donaldma/spotify-liked [${start} - ${end}]`
-        },
-        async createOrEditPlaylist(start, end, option) {
-            // console.log('createOrEditPlaylist')
-
-            const label = this.options[option].label
-            const title = `Liked ${label}`
-            const description = this.createdDescription(start, end)
-
-            const { body: playlists } = await this.api.getUserPlaylists({
-                limit: this.limit,
-            })
-
-            const foundPlaylist = playlists.items.find((item) => {
-                const itemDescription = decodeXML(item.description)
-                return (
-                    item.name === title &&
-                    isMatch(itemDescription, this.createdDescription('*', '*'))
+        const bucket = savedTracks.items
+            .filter((item) => {
+                return dayjs(item.added_at).isBetween(
+                    start,
+                    end,
+                    unit,
+                    inclusivity || '[]'
                 )
             })
+            .map((item) => item.track.uri)
 
-            if (foundPlaylist) {
-                // console.log('editPlaylist')
+        tracks = concat(tracks, bucket)
 
-                const { id, snapshot_id, tracks } = foundPlaylist
-                const positions = range(0, tracks.total)
+        if (bucket.length === limit.value) {
+            offset.value = offset.value + limit.value
+            await get()
+        }
+    }
 
-                if (positions.length > 0) {
-                    await this.api.removeTracksFromPlaylistByPosition(
-                        id,
-                        positions,
-                        snapshot_id
-                    )
-                }
+    await get()
 
-                await this.api.changePlaylistDetails(id, {
-                    description,
-                })
+    // console.log('getMySavedTracks', {
+    //     option,
+    //     length: tracks.length,
+    //     start,
+    //     end,
+    //     unit,
+    //     inclusivity,
+    // })
 
-                return foundPlaylist
-            }
+    return {
+        tracks,
+        start: start.format(format),
+        end: end.format(format),
+    }
+}
 
-            // console.log('createPlaylist')
-            const { body: createdPlaylist } = await this.api.createPlaylist(
-                title,
-                { description }
+const createOrEditPlaylist = async (start, end, option) => {
+    // console.log('createOrEditPlaylist')
+
+    const label = options.value[option].label
+    const title = `Liked ${label}`
+    const description = createDescription(start, end)
+
+    const { body: playlists } = await rawApi.getUserPlaylists({
+        limit: limit.value,
+    })
+
+    const foundPlaylist = playlists.items.find((item) => {
+        const itemDescription = decodeXML(item.description)
+        return (
+            item.name === title &&
+            isMatch(itemDescription, createDescription('*', '*'))
+        )
+    })
+
+    if (foundPlaylist) {
+        // console.log('editPlaylist')
+
+        const { id, snapshot_id, tracks } = foundPlaylist
+        const positions = range(0, tracks.total)
+
+        if (positions.length > 0) {
+            await rawApi.removeTracksFromPlaylistByPosition(
+                id,
+                positions,
+                snapshot_id
             )
+        }
 
-            return createdPlaylist
-        },
-    },
+        await rawApi.changePlaylistDetails(id, {
+            description,
+        })
+
+        return foundPlaylist
+    }
+
+    // console.log('createPlaylist')
+    const { body: createdPlaylist } = await rawApi.createPlaylist(title, {
+        description,
+    })
+
+    return createdPlaylist
 }
 </script>
