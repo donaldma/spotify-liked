@@ -135,21 +135,24 @@ const resetQueryParams = () => {
  * methods
  */
 const auth = () => {
-    const url = stringifyUrl({
-        url: 'https://accounts.spotify.com/en/authorize',
-        query: {
-            client_id: rawApi._credentials.clientId,
-            redirect_uri: rawApi._credentials.redirectUri,
-            response_type: 'token',
-            scope: [
-                'user-library-read',
-                'playlist-modify-public',
-                'playlist-read-collaborative',
-            ],
-            show_dialog: true,
-            state: 'spotify-liked-this-week',
+    const url = stringifyUrl(
+        {
+            url: 'https://accounts.spotify.com/en/authorize',
+            query: {
+                client_id: rawApi._credentials.clientId,
+                redirect_uri: rawApi._credentials.redirectUri,
+                response_type: 'token',
+                scope: [
+                    'user-library-read',
+                    'playlist-modify-public',
+                    'playlist-read-collaborative',
+                ],
+                show_dialog: true,
+                state: 'spotify-liked-this-week',
+            },
         },
-    })
+        { arrayFormat: 'separator', arrayFormatSeparator: ' ' }
+    )
     location.href = url
 }
 
