@@ -7,35 +7,19 @@
                     Generate various playlists from your liked songs.
                 </p>
 
-                <button
-                    v-show="!getAuth()"
-                    class="btn btn-primary flex mx-auto"
-                    @click="auth"
-                >
+                <button v-show="!getAuth()" class="btn btn-primary flex mx-auto" @click="auth">
                     Connect with Spotify
                 </button>
 
                 <div v-show="getAuth()">
                     <div class="form-control mb-5">
-                        <label
-                            v-for="(option, index) in options"
-                            :key="index"
-                            class="label cursor-pointer"
-                        >
+                        <label v-for="(option, index) in options" :key="index" class="label cursor-pointer">
                             <span class="label-text">{{ option.label }}</span>
-                            <input
-                                type="checkbox"
-                                v-model="checked"
-                                :value="index"
-                                :disabled="option.disabled"
-                                class="checkbox checkbox-primary"
-                            />
+                            <input type="checkbox" v-model="checked" :value="index" :disabled="option.disabled"
+                                class="checkbox checkbox-primary" />
                         </label>
                     </div>
-                    <button
-                        class="btn btn-primary flex w-full"
-                        @click="mainWrapper"
-                    >
+                    <button class="btn btn-primary flex w-full" @click="mainWrapper">
                         Generate
                     </button>
                 </div>
@@ -75,7 +59,7 @@ setAuth()
  * data
  */
 const loading = ref(false)
-const checked = ref(range(5))
+const checked = ref([3, 4])
 const options = ref([
     {
         label: 'This Release Period',
@@ -98,6 +82,7 @@ const options = ref([
         disabled: false,
     },
 ])
+
 // api stuff
 const api = ref(
     new SpotifyWebApi({
@@ -231,14 +216,14 @@ const getMySavedTracks = async (option) => {
 
     await get()
 
-    // console.log('getMySavedTracks', {
-    //     option,
-    //     length: tracks.length,
-    //     start,
-    //     end,
-    //     unit,
-    //     inclusivity,
-    // })
+    console.log('getMySavedTracks', {
+        option,
+        length: tracks.length,
+        start,
+        end,
+        unit,
+        inclusivity,
+    })
 
     return {
         tracks,
