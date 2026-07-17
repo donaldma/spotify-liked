@@ -11,7 +11,6 @@ const stateKey = 'auth_state'
 const scopes = [
     'user-library-read',
     'playlist-modify-public',
-    'playlist-modify-private',
     'playlist-read-collaborative',
 ]
 

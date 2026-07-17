@@ -26,10 +26,6 @@
                                 class="input input-bordered input-sm w-full" />
                         </div>
 
-                        <label class="label cursor-pointer">
-                            <span class="label-text">Make playlists private</span>
-                            <input type="checkbox" v-model="makePrivate" class="checkbox checkbox-primary" />
-                        </label>
                     </div>
                     <button class="btn btn-primary flex w-full" :disabled="loading" @click="mainWrapper">
                         <span v-show="loading" class="loading loading-spinner"></span>
@@ -158,10 +154,9 @@ const options = ref([
 const customIndex = 5
 const customStart = ref(settings.customStart ?? '')
 const customEnd = ref(settings.customEnd ?? '')
-const makePrivate = ref(settings.makePrivate ?? false)
 
 watch(
-    [checked, customStart, customEnd, makePrivate],
+    [checked, customStart, customEnd],
     () => {
         localStorage.setItem(
             settingsKey,
@@ -169,7 +164,6 @@ watch(
                 checked: checked.value,
                 customStart: customStart.value,
                 customEnd: customEnd.value,
-                makePrivate: makePrivate.value,
             })
         )
     },
@@ -349,11 +343,21 @@ const main = async () => {
             })
         )
     } catch (error) {
+        const message =
+            error.body?.error?.message || error.message || 'Something went wrong'
+
         if (error.statusCode === 401) {
             clearAuth(null)
         }
-        errorMessage.value =
-            error.body?.error?.message || error.message || 'Something went wrong'
+
+        // stale login that is missing newly required scopes
+        if (error.statusCode === 403 && message.includes('scope')) {
+            clearAuth(null)
+            errorMessage.value =
+                'Spotify permissions have changed, reconnect to grant them'
+        } else {
+            errorMessage.value = message
+        }
         console.error(error)
     } finally {
         loading.value = false
@@ -475,7 +479,6 @@ const createOrEditPlaylist = async (userPlaylists, start, end, title) => {
     // console.log('createOrEditPlaylist')
 
     const description = createDescription(start, end)
-    const isPublic = !makePrivate.value
 
     const foundPlaylist = userPlaylists.find((item) => {
         const itemDescription = decodeXML(item.description)
@@ -495,7 +498,6 @@ const createOrEditPlaylist = async (userPlaylists, start, end, title) => {
         await withRetry(() =>
             rawApi.changePlaylistDetails(id, {
                 description,
-                public: isPublic,
             })
         )
 
@@ -506,7 +508,6 @@ const createOrEditPlaylist = async (userPlaylists, start, end, title) => {
     const { body: createdPlaylist } = await withRetry(() =>
         rawApi.createPlaylist(title, {
             description,
-            public: isPublic,
         })
     )
 
