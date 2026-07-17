@@ -4,5 +4,5 @@
 </template>
 
 <script setup>
-import NavHeader from '@/components/nav-header'
+import NavHeader from '@/components/nav-header.vue'
 </script>

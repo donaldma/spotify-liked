@@ -19,16 +19,16 @@
             <div class="flex flex-none items-center">
                 <router-link
                     to="/"
-                    class="flex-0 btn btn-ghost px-2 md:px-4"
+                    class="flex-0 flex items-center px-2 md:px-4"
                     aria-label="Homepage"
                 >
                     <div class="font-title inline-block text-primary text-3xl">
-                        <span class="text-base-content uppercase">
+                        <span class="text-base-content">
                             {{ logo }}
                         </span>
                     </div>
                 </router-link>
-                <div class="badge badge-error">{{ version }}</div>
+                <div class="badge badge-info">{{ version }}</div>
             </div>
 
             <div class="flex-1" />
@@ -87,10 +87,13 @@
             </div>
 
             <div v-if="getAuth()" class="dropdown dropdown-end" title="User">
-                <div tabindex="0" class="btn btn-ghost btn-circle m-1">
+                <div tabindex="0" class="btn btn-ghost m-1 normal-case">
+                    <span v-if="profile?.name" class="hidden md:inline mr-2">
+                        {{ profile.name }}
+                    </span>
                     <div class="avatar">
                         <div class="w-10 h-10 rounded-full">
-                            <img src="../assets/avatar.svg" />
+                            <img :src="profile?.image || avatarFallback" alt="Profile" />
                         </div>
                     </div>
                 </div>
@@ -109,6 +112,12 @@
                 >
                     <ul class="menu compact p-4">
                         <li>
+                            <a tabindex="0" target="_blank" rel="noopener"
+                                href="https://www.spotify.com/account/apps/">
+                                Remove app access
+                            </a>
+                        </li>
+                        <li>
                             <a tabindex="0" @click="() => clearAuth()">
                                 Logout
                             </a>
@@ -122,11 +131,12 @@
 
 <script setup>
 import { themeChange } from 'theme-change'
-import { onMounted } from 'vue'
-import { getAuth, clearAuth } from '@/utils/auth'
+import { onMounted, ref } from 'vue'
+import { getAuth, clearAuth, ensureAuth } from '@/utils/auth'
+import avatarFallback from '../assets/avatar.svg'
 
-const logo = 'Liked'
-const version = 'alpha'
+const logo = 'Spotify Liked'
+const version = 'beta'
 const themes = [
     { id: 'light', name: '🌝  light' },
     { id: 'dark', name: '🌚  dark' },
@@ -151,7 +161,38 @@ const themes = [
     { id: 'dracula', name: '🧛‍♂️  dracula' },
 ]
 
+const profile = ref(null)
+
+const loadProfile = async () => {
+    if (!getAuth()) {
+        return
+    }
+
+    try {
+        const token = await ensureAuth()
+        if (!token) {
+            return
+        }
+
+        const response = await fetch('https://api.spotify.com/v1/me', {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok) {
+            return
+        }
+
+        const me = await response.json()
+        profile.value = {
+            name: me.display_name,
+            image: me.images?.[0]?.url,
+        }
+    } catch (error) {
+        console.error('failed to load profile', error)
+    }
+}
+
 onMounted(() => {
     themeChange(false)
+    loadProfile()
 })
 </script>

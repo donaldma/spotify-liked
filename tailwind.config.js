@@ -1,12 +1,10 @@
 module.exports = {
-    mode: 'jit',
-    purge: { content: ['./public/**/*.html', './src/**/*.vue'] },
-    darkMode: false, // or 'media' or 'class'
+    content: ['./index.html', './src/**/*.{vue,js}'],
     theme: {
         extend: {},
     },
-    variants: {
-        extend: {},
-    },
     plugins: [require('daisyui')],
+    daisyui: {
+        themes: true,
+    },
 }
