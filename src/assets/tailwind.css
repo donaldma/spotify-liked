@@ -3,3 +3,9 @@
 @tailwind components;
 
 @tailwind utilities;
+
+/* nothing scrolls sideways, especially on mobile */
+html,
+body {
+    overflow-x: hidden;
+}
