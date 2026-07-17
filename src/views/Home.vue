@@ -40,20 +40,22 @@
 /* eslint-disable */
 import { ref, unref, computed } from 'vue'
 import SpotifyWebApi from 'spotify-web-api-node'
-import { stringifyUrl } from 'query-string'
 import { decodeXML } from 'entities'
 import { isMatch } from 'matcher'
 import pluralize from 'pluralize'
 
-import concat from 'lodash/concat'
-import range from 'lodash/range'
 import chunk from 'lodash/chunk'
 
 import dayjs from '@/utils/dayjs'
-import { setAuth, getAuth, clearAuth } from '@/utils/auth'
+import { setAuth, getAuth, clearAuth, beginAuth } from '@/utils/auth'
 import { getStartEnd, createDescription } from '@/utils/spotify'
 
-setAuth()
+const credentials = {
+    clientId: process.env.VUE_APP_CLIENT_ID,
+    redirectUri: process.env.URL || process.env.VUE_APP_REDIRECT_URI,
+}
+
+setAuth(credentials)
 
 /**
  * data
@@ -86,8 +88,7 @@ const options = ref([
 // api stuff
 const api = ref(
     new SpotifyWebApi({
-        clientId: process.env.VUE_APP_CLIENT_ID,
-        redirectUri: process.env.URL || process.env.VUE_APP_REDIRECT_URI,
+        ...credentials,
         accessToken: getAuth(),
     })
 )
@@ -105,40 +106,22 @@ const doneMessage = computed(() => {
 })
 
 // query param stuff
-const defaultQueryParams = {
-    limit: 50,
-    offset: 0,
-}
-const limit = ref(defaultQueryParams.limit)
-const offset = ref(defaultQueryParams.offset)
-const resetQueryParams = () => {
-    limit.value = defaultQueryParams.limit
-    offset.value = defaultQueryParams.offset
-}
+const pageSize = 50
+const concurrency = 5
 
 /**
  * methods
  */
 const auth = () => {
-    const url = stringifyUrl(
-        {
-            url: 'https://accounts.spotify.com/en/authorize',
-            query: {
-                client_id: rawApi._credentials.clientId,
-                redirect_uri: rawApi._credentials.redirectUri,
-                response_type: 'token',
-                scope: [
-                    'user-library-read',
-                    'playlist-modify-public',
-                    'playlist-read-collaborative',
-                ],
-                show_dialog: true,
-                state: 'spotify-liked-this-week',
-            },
-        },
-        { arrayFormat: 'separator', arrayFormatSeparator: ' ' }
-    )
-    location.href = url
+    beginAuth({
+        ...credentials,
+        scope: [
+            'user-library-read',
+            'playlist-modify-public',
+            'playlist-read-collaborative',
+        ],
+        state: 'spotify-liked-this-week',
+    })
 }
 
 const mainWrapper = async () => {
@@ -155,26 +138,39 @@ const main = async () => {
     loading.value = true
 
     try {
-        // get me
-        const { body: me } = await rawApi.getMe()
-
         playlists.value = []
 
-        for (const option of checked.value) {
-            // get all liked tracks
-            const { tracks, start, end } = await getMySavedTracks(option)
-            // create or edit playlist info
-            const playlist = await createOrEditPlaylist(start, end, option)
-            // add tracks to playlist
-            if (tracks.length > 0) {
+        // fetch liked tracks once, back to the earliest date any option needs
+        const earliestStart = checked.value
+            .map((option) => getStartEnd(option).start)
+            .reduce((min, start) => (start.isBefore(min) ? start : min))
+        const savedTracks = await getMySavedTracks(earliestStart)
+
+        // fetch existing playlists once
+        const { body: userPlaylists } = await rawApi.getUserPlaylists({
+            limit: pageSize,
+        })
+
+        await Promise.all(
+            checked.value.map(async (option) => {
+                // filter liked tracks locally
+                const { tracks, start, end } = filterTracks(savedTracks, option)
+                // create or edit playlist info
+                const playlist = await createOrEditPlaylist(
+                    userPlaylists.items,
+                    start,
+                    end,
+                    option
+                )
+                // add tracks to playlist
                 for (const chunkAdd of chunk(tracks, 100)) {
                     await rawApi.addTracksToPlaylist(playlist.id, chunkAdd)
                 }
-            }
 
-            playlists.value.push(playlist.external_urls.spotify)
-            // console.log({ tracks, playlist, start, end })
-        }
+                playlists.value.push(playlist.external_urls.spotify)
+                // console.log({ tracks, playlist, start, end })
+            })
+        )
     } catch (error) {
         if (error.statusCode === 401) {
             clearAuth(null)
@@ -185,41 +181,67 @@ const main = async () => {
     }
 }
 
-const getMySavedTracks = async (option) => {
-    let tracks = []
-    resetQueryParams()
+// pages through liked tracks (newest first) in parallel batches,
+// stopping once results are older than earliestStart
+const getMySavedTracks = async (earliestStart) => {
+    const { body: first } = await rawApi.getMySavedTracks({
+        limit: pageSize,
+        offset: 0,
+    })
 
-    const { start, end, unit, inclusivity } = getStartEnd(option)
-    const format = 'ddd, ll'
+    const items = [...first.items]
+    let offset = pageSize
 
-    const get = async () => {
-        const { body: savedTracks } = await rawApi.getMySavedTracks({
-            limit: limit.value,
-            offset: offset.value,
-        })
+    while (offset < first.total) {
+        const oldest = items[items.length - 1]
+        if (oldest && dayjs(oldest.added_at).isBefore(earliestStart)) {
+            break
+        }
 
-        const bucket = savedTracks.items
-            .filter((item) => {
-                return dayjs(item.added_at).isBetween(
-                    start,
-                    end,
-                    unit,
-                    inclusivity || '[]'
-                )
+        const offsets = []
+        while (offsets.length < concurrency && offset < first.total) {
+            offsets.push(offset)
+            offset = offset + pageSize
+        }
+
+        const pages = await Promise.all(
+            offsets.map((pageOffset) => {
+                return rawApi.getMySavedTracks({
+                    limit: pageSize,
+                    offset: pageOffset,
+                })
             })
-            .map((item) => item.track.uri)
+        )
 
-        tracks = concat(tracks, bucket)
-
-        if (bucket.length === limit.value) {
-            offset.value = offset.value + limit.value
-            await get()
+        for (const { body } of pages) {
+            items.push(...body.items)
         }
     }
 
-    await get()
-
     console.log('getMySavedTracks', {
+        fetched: items.length,
+        total: first.total,
+    })
+
+    return items
+}
+
+const filterTracks = (savedTracks, option) => {
+    const { start, end, unit, inclusivity } = getStartEnd(option)
+    const format = 'ddd, ll'
+
+    const tracks = savedTracks
+        .filter((item) => {
+            return dayjs(item.added_at).isBetween(
+                start,
+                end,
+                unit,
+                inclusivity || '[]'
+            )
+        })
+        .map((item) => item.track.uri)
+
+    console.log('filterTracks', {
         option,
         length: tracks.length,
         start,
@@ -235,18 +257,14 @@ const getMySavedTracks = async (option) => {
     }
 }
 
-const createOrEditPlaylist = async (start, end, option) => {
+const createOrEditPlaylist = async (userPlaylists, start, end, option) => {
     // console.log('createOrEditPlaylist')
 
     const label = options.value[option].label
     const title = `Liked ${label}`
     const description = createDescription(start, end)
 
-    const { body: playlists } = await rawApi.getUserPlaylists({
-        limit: limit.value,
-    })
-
-    const foundPlaylist = playlists.items.find((item) => {
+    const foundPlaylist = userPlaylists.find((item) => {
         const itemDescription = decodeXML(item.description)
         return (
             item.name === title &&
@@ -257,15 +275,11 @@ const createOrEditPlaylist = async (start, end, option) => {
     if (foundPlaylist) {
         // console.log('editPlaylist')
 
-        const { id, snapshot_id, tracks } = foundPlaylist
-        const positions = range(0, tracks.total)
+        const { id, tracks } = foundPlaylist
 
-        if (positions.length > 0) {
-            await rawApi.removeTracksFromPlaylistByPosition(
-                id,
-                positions,
-                snapshot_id
-            )
+        // clears the whole playlist in a single request
+        if (tracks.total > 0) {
+            await rawApi.replaceTracksInPlaylist(id, [])
         }
 
         await rawApi.changePlaylistDetails(id, {
