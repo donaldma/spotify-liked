@@ -34,7 +34,7 @@
             <div class="flex-1" />
 
             <div class="dropdown dropdown-end" title="Change Theme">
-                <div tabindex="0" class="btn-ghost btn m-1 normal-case">
+                <div tabindex="0" class="btn-ghost btn m-1 normal-case" @mousedown="toggleDropdown">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -51,7 +51,7 @@
                     <span class="hidden md:inline"> Change Theme </span>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        class="inline-block ml-1 w-4 h-4 fill-current"
+                        class="hidden md:inline-block ml-1 w-4 h-4 fill-current"
                         viewBox="0 0 1792 1792"
                     >
                         <path
@@ -87,7 +87,7 @@
             </div>
 
             <div v-if="getAuth()" class="dropdown dropdown-end" title="User">
-                <div tabindex="0" class="btn btn-ghost m-1 normal-case">
+                <div tabindex="0" class="btn btn-ghost m-1 normal-case" @mousedown="toggleDropdown">
                     <span v-if="profile?.name" class="hidden md:inline mr-2">
                         {{ profile.name }}
                     </span>
@@ -162,6 +162,16 @@ const themes = [
 ]
 
 const profile = ref(null)
+
+// daisyui dropdowns open on focus, so a second click/tap on the trigger
+// would normally refocus and keep them open; blur to close instead
+const toggleDropdown = (event) => {
+    const trigger = event.currentTarget
+    if (trigger.contains(document.activeElement)) {
+        event.preventDefault()
+        document.activeElement.blur()
+    }
+}
 
 const loadProfile = async () => {
     if (!getAuth()) {
