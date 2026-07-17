@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # public values, they ship in the client bundle by design (PKCE, no secret)
+  VITE_CLIENT_ID = "737d37cd6142410cbc422460341c884b"
+  VITE_REDIRECT_URI = "https://spotify-liked.netlify.app"
