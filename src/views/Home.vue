@@ -446,6 +446,8 @@ const filterTracks = (savedTracks, option) => {
                 inclusivity || '[]'
             )
         })
+        // most recently liked first
+        .sort((a, b) => new Date(b.added_at) - new Date(a.added_at))
         .map((item) => item.track.uri)
 
     console.log('filterTracks', {
