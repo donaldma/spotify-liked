@@ -8,9 +8,15 @@ const scopeKey = 'granted_scope'
 const verifierKey = 'code_verifier'
 const stateKey = 'auth_state'
 
+// the private scopes are needed even though playlists are created public:
+// the API treats playlists not displayed on the user's profile as private,
+// which includes playlists it created itself, so reading them back and
+// refreshing their tracks fails without them
 const scopes = [
     'user-library-read',
     'playlist-modify-public',
+    'playlist-modify-private',
+    'playlist-read-private',
     'playlist-read-collaborative',
 ]
 
@@ -115,6 +121,24 @@ export const setAuth = async () => {
     }
 }
 
+const refreshTokens = async (refreshToken) => {
+    const body = await requestTokens({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+    })
+
+    if (!body.access_token) {
+        console.error('Spotify token refresh failed', body)
+        clearAuth(null)
+        return null
+    }
+
+    storeTokens(body)
+    return body.access_token
+}
+
+let refreshPromise = null
+
 // returns a valid access token, refreshing it first if (nearly) expired
 export const ensureAuth = async () => {
     const token = getAuth()
@@ -134,19 +158,14 @@ export const ensureAuth = async () => {
         return null
     }
 
-    const body = await requestTokens({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-    })
-
-    if (!body.access_token) {
-        console.error('Spotify token refresh failed', body)
-        clearAuth(null)
-        return null
+    // Spotify rotates refresh tokens, so concurrent refreshes invalidate
+    // each other; callers share a single in-flight refresh instead
+    if (!refreshPromise) {
+        refreshPromise = refreshTokens(refreshToken).finally(() => {
+            refreshPromise = null
+        })
     }
-
-    storeTokens(body)
-    return body.access_token
+    return refreshPromise
 }
 
 export const clearAuth = (redirect = '/') => {

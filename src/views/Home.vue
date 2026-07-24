@@ -31,10 +31,12 @@
                         <span v-show="loading" class="loading loading-spinner"></span>
                         Generate
                     </button>
-                    <p v-if="errorMessage" class="text-error mt-3">
-                        {{ errorMessage }}
-                    </p>
                 </div>
+
+                <!-- outside the logged-in block so a forced logout still shows its reason -->
+                <p v-if="errorMessage" class="text-error mt-3">
+                    {{ errorMessage }}
+                </p>
 
                 <div class="mt-8 text-sm text-left opacity-60 space-y-2">
                     <p>
