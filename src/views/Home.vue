@@ -38,6 +38,24 @@
                     {{ errorMessage }}
                 </p>
 
+                <!-- progress and results, right under the button that triggers them -->
+                <div v-if="loading || playlists.length > 0" class="flex flex-col items-center space-y-2 mt-5">
+                    <span v-if="loading">{{ progressMessage }}</span>
+
+                    <template v-else>
+                        <span>{{ doneMessage }}</span>
+                        <template v-for="playlist in playlists" :key="playlist.name">
+                            <a v-if="playlist.url" :href="playlist.url" target="_blank" rel="noopener"
+                                class="link link-primary">
+                                {{ playlist.name }} · {{ pluralize('track', playlist.count, true) }}
+                            </a>
+                            <span v-else class="opacity-60">
+                                {{ playlist.name }} · no liked songs, skipped
+                            </span>
+                        </template>
+                    </template>
+                </div>
+
                 <div class="mt-8 text-sm text-left opacity-60 space-y-2">
                     <p>
                         Pick one or more time ranges and hit Generate. Each
@@ -63,23 +81,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- spotify loader -->
-    <div class="flex flex-col items-center justify-center w-full space-y-2 pb-8">
-        <span v-show="loading">{{ progressMessage }}</span>
-
-        <template v-if="!loading && playlists.length > 0">
-            <span>{{ doneMessage }}</span>
-            <template v-for="playlist in playlists" :key="playlist.name">
-                <a v-if="playlist.url" :href="playlist.url" target="_blank" rel="noopener" class="link link-primary">
-                    {{ playlist.name }} · {{ pluralize('track', playlist.count, true) }}
-                </a>
-                <span v-else class="opacity-60">
-                    {{ playlist.name }} · no liked songs, skipped
-                </span>
-            </template>
-        </template>
     </div>
 </template>
 
